@@ -1,0 +1,642 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Unit Circle Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Source+Sans+3:wght@400;600;700&family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Layout: one centered column. The circle sits on top, a row of show/hide switches under it, then the readouts and slider it controls. */
+:root {
+  --bg: #EEF3F6;
+  --surface: #FFFFFF;
+  --surface-2: #E3EBF0;
+  --disk: #F3F8FA;
+  --ink: #12222C;
+  --ink-2: #4B5E6A;
+  --line: #C6D3DB;
+  --grid: #D9E3E9;
+  --accent: #0B7285;
+  --accent-soft: rgba(11, 114, 133, 0.13);
+  --accent-ink: #FFFFFF;
+  --xleg: #AD4E09;
+  --yleg: #2F4BD8;
+  --thumb: 22px;
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+  --font-math: 'STIX Two Text', 'Cambria Math', 'Times New Roman', serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1920;
+    --surface: #15242D;
+    --surface-2: #1D303B;
+    --disk: #1A2C37;
+    --ink: #E6EEF2;
+    --ink-2: #9DB1BD;
+    --line: #2E4553;
+    --grid: #25394564;
+    --accent: #3CC4D8;
+    --accent-soft: rgba(60, 196, 216, 0.16);
+    --accent-ink: #05222A;
+    --xleg: #F5A962;
+    --yleg: #8FA5FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1920;
+  --surface: #15242D;
+  --surface-2: #1D303B;
+  --disk: #1A2C37;
+  --ink: #E6EEF2;
+  --ink-2: #9DB1BD;
+  --line: #2E4553;
+  --grid: #25394564;
+  --accent: #3CC4D8;
+  --accent-soft: rgba(60, 196, 216, 0.16);
+  --accent-ink: #05222A;
+  --xleg: #F5A962;
+  --yleg: #8FA5FF;
+  color-scheme: dark;
+}
+@media (pointer: coarse) { :root { --thumb: 30px; } }
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 var(--font-body);
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 720px; margin: 0 auto; }
+h1 {
+  font: 700 clamp(1.6rem, 6vw, 2.3rem)/1.1 var(--font-display);
+  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+.lead { margin: 0; color: var(--ink-2); max-width: 62ch; font-size: 1.02rem; }
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  margin-top: 18px;
+  min-width: 0;
+}
+
+/* Circle */
+.stage { overflow: auto; max-height: 82vh; max-height: 82svh; border-radius: 10px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.stage.zoomed { box-shadow: inset 0 0 0 1px var(--line); cursor: grab; }
+.stage.panning { cursor: grabbing; user-select: none; }
+#uc { display: block; max-width: none; margin: 0 auto; font-family: var(--font-body); user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+#uc .disk { fill: var(--disk); }
+#uc .gridl { stroke: var(--grid); stroke-width: 1; }
+#uc .axis { stroke: var(--ink-2); stroke-width: 1.2; }
+#uc .rim { fill: none; stroke: var(--ink-2); stroke-width: 1.8; }
+#uc .rtick { stroke: var(--ink-2); stroke-width: 1.6; }
+#uc .tickl { fill: var(--ink-2); }
+#uc .dg { fill: var(--ink-2); }
+#uc .rl .cm { fill: var(--ink-2); color: var(--ink-2); }
+#uc .rl.on .cm { fill: var(--accent); color: var(--accent); font-weight: 600; }
+#uc .rl.on .dg { fill: var(--accent); font-weight: 700; }
+/* label groups: la = angle, lp = point, lr = reference angle (a label tagged la and lr stays while either is on) */
+#uc.hide-angle .la:not(.lr) { display: none; }
+#uc.hide-ref .lr:not(.la) { display: none; }
+#uc.hide-point .lp { display: none; }
+#uc.hide-angle.hide-ref .la.lr { display: none; }
+#dyn { pointer-events: none; }
+.leg { stroke-width: 4.5; stroke-linecap: round; fill: none; }
+.lx { stroke: var(--xleg); }
+.ly { stroke: var(--yleg); }
+.hyp { stroke: var(--ink); stroke-width: 3.5; stroke-linecap: round; }
+.tri-fill { fill: var(--accent-soft); }
+.tri-fill.hot { fill: var(--accent); fill-opacity: 0.22; }
+.rt { fill: none; stroke: var(--ink-2); stroke-width: 1.5; }
+.arc-th, .arr-th, .arr-ref { fill: none; stroke: var(--ink); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.arc-ref { fill: none; stroke: var(--accent); stroke-width: 2.6; }
+.arr-ref { stroke: var(--accent); stroke-width: 2.6; }
+.pt { fill: var(--accent); stroke: var(--surface); stroke-width: 3.5; pointer-events: none; }
+.halo { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; stroke-opacity: 0.45; pointer-events: none; }
+.halo.sp { stroke-opacity: 1; stroke-width: 2.5; }
+.hit { fill: transparent; }
+.grab { cursor: grab; touch-action: none; }
+.grab:active { cursor: grabbing; }
+
+.m, .m text, text.m { font-family: var(--font-math); }
+text.m, .m text { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+.ci { fill: var(--ink); color: var(--ink); }
+.cm { fill: var(--ink-2); color: var(--ink-2); }
+.cx { fill: var(--xleg); color: var(--xleg); }
+.cy { fill: var(--yleg); color: var(--yleg); }
+.ang { fill: var(--accent); color: var(--accent); font-style: italic; }
+.ang.num { font-style: normal; font-weight: 600; }
+.angt { fill: var(--ink); color: var(--ink); font-weight: 600; }
+
+/* Show / hide switches */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.tb-label { flex: 0 0 100%; font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.tog {
+  display: inline-flex; align-items: center; gap: 8px;
+  min-height: 44px; touch-action: manipulation; padding: 0 14px 0 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2);
+  font: 600 0.92rem var(--font-body); cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tog::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; flex: none; }
+.tog[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--ink); }
+.tog[aria-pressed="true"]::before { background: var(--accent); border-color: var(--accent); }
+.tog:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Readouts */
+.readout { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.cell { flex: 1 1 150px; background: var(--surface-2); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.cell.point { flex: 2 1 230px; }
+@media (max-width: 600px) { .cell.point { order: -1; flex-basis: 100%; } }
+.cell .k { font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.cell .v { font-family: var(--font-math); font-size: 1.55rem; line-height: 1.25; display: flex; align-items: center; flex-wrap: wrap; gap: 0.12em 0.3em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.sub { font-family: var(--font-body); font-size: 0.9rem; color: var(--ink-2); }
+.vx { color: var(--xleg); }
+.vy { color: var(--yleg); }
+.frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1.05; font-size: 0.82em; }
+.frac > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 0.14em 0.06em; }
+.frac > span:last-child { padding-top: 0.06em; }
+.neg { display: inline-block; width: 0.5em; height: 0.12em; margin-right: 0.36em; border-radius: 0.06em; background: currentColor; vertical-align: middle; }
+
+/* Special-angle tag above the circle */
+.badgebar { min-height: 36px; display: flex; align-items: center; justify-content: center; margin-bottom: 6px; }
+.pill { visibility: hidden; padding: 5px 14px; border-radius: 999px; background: var(--accent-soft); border: 1px solid var(--accent); color: var(--ink); font: 700 0.92rem/1.3 var(--font-body); text-align: center; }
+.pill.on { visibility: visible; }
+
+@media (max-width: 480px) {
+  .card { padding: 10px; }
+  .lead { font-size: 0.98rem; }
+  .pill { font-size: 0.85rem; }
+  .cell .v { font-size: 1.4rem; }
+}
+
+/* Slider */
+.ctl { margin-top: 16px; }
+.ctl-head { display: flex; justify-content: space-between; align-items: baseline; }
+.ctl-head label { font-weight: 700; font-family: var(--font-display); }
+.ctl-head output { font-family: var(--font-math); font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: calc(var(--thumb) + 10px); background: transparent; margin: 4px 0 0; cursor: pointer; touch-action: pan-y; }
+input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--line); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; box-sizing: border-box; width: var(--thumb); height: var(--thumb); border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); margin-top: calc((6px - var(--thumb)) / 2); }
+input[type=range]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+input[type=range]::-moz-range-thumb { box-sizing: border-box; width: var(--thumb); height: var(--thumb); border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--accent); }
+input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.ticks { position: relative; height: 58px; }
+.ticks i { position: absolute; top: 0; left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p)); width: 1px; height: 7px; background: var(--ink-2); opacity: 0.7; }
+.ticks i.q { height: 11px; opacity: 1; }
+.ticks b { position: absolute; top: 14px; left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--p)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; font: 600 0.74rem var(--font-body); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ticks b .tr { font: 400 0.98rem/1.1 var(--font-math); color: var(--ink); }
+.check { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: var(--ink); min-height: 36px; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Unit Circle Explorer</h1>
+    <p class="lead">Drag the point around the circle or use the angle slider. The hypotenuse is always 1, so the two legs of the triangle are the x and y coordinates of the point. Each switch under the circle shows or hides a readout together with its labels on the circle.</p>
+  </header>
+
+  <section class="card" aria-label="Unit circle">
+    <div class="badgebar"><span class="pill" id="badge" role="status"></span></div>
+    <div class="stage" id="stage" tabindex="0" role="region" aria-label="Unit circle viewport">
+    <svg id="uc" width="320" height="320" viewBox="0 0 320 320" role="img" aria-label="Unit circle with a movable point">
+      <g id="base"></g>
+      <g id="dyn"></g>
+      <circle id="halo" class="halo" r="22" cx="510" cy="300"></circle>
+      <circle id="hit" class="grab hit" r="34" cx="510" cy="300"></circle>
+      <circle id="pt" class="pt" r="11" cx="510" cy="300"></circle>
+    </svg>
+    </div>
+
+    <div class="toolbar" role="group" aria-label="Show or hide">
+      <span class="tb-label">Show</span>
+      <button type="button" class="tog" data-target="cAngle" aria-pressed="true">Angle</button>
+      <button type="button" class="tog" data-target="cPoint" aria-pressed="true">Point (x, y)</button>
+      <button type="button" class="tog" data-target="cRef" aria-pressed="true">Reference angle</button>
+      <button type="button" class="tog" data-target="ctl" aria-pressed="true">Angle slider</button>
+    </div>
+
+    <div class="readout" id="readout">
+      <div class="cell" id="cAngle"></div>
+      <div class="cell point" id="cPoint"></div>
+      <div class="cell" id="cRef"></div>
+    </div>
+
+    <div class="ctl" id="ctl">
+      <div class="ctl-head">
+        <label for="angle">Angle θ</label>
+        <output id="angleOut" for="angle">30°</output>
+      </div>
+      <input type="range" id="angle" min="0" max="360" step="1" value="30" aria-valuetext="30 degrees">
+      <div class="ticks" id="ticks" aria-hidden="true"></div>
+      <label class="check"><input type="checkbox" id="stick" checked> Stick to special angles</label>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  /* The drawing is laid out in real pixels: text keeps a readable size on a phone, and the
+     size slider only changes the radius, so a bigger circle gives the same labels more room. */
+  var DEG = Math.PI / 180, M = 62;
+  var S = 320, R = 106, CX = 160, CY = 160;
+  var FS = { leg: 15, ang: 14, rim: 14, deg: 12 };
+  var f = function (n) { return +n.toFixed(2); };
+  var $ = function (id) { return document.getElementById(id); };
+  var clamp = function (lo, v, hi) { return Math.max(lo, Math.min(hi, v)); };
+
+  var SPECIAL = [0, 30, 45, 60, 90, 120, 135, 150, 180, 210, 225, 240, 270, 300, 315, 330, 360];
+  var RAD = {
+    0: ['0'], 30: ['π', '6'], 45: ['π', '4'], 60: ['π', '3'], 90: ['π', '2'],
+    120: ['2π', '3'], 135: ['3π', '4'], 150: ['5π', '6'], 180: ['π'],
+    210: ['7π', '6'], 225: ['5π', '4'], 240: ['4π', '3'], 270: ['3π', '2'],
+    300: ['5π', '3'], 315: ['7π', '4'], 330: ['11π', '6'], 360: ['2π']
+  };
+  var EXACT = {
+    0: { c: ['1'], s: ['0'] },
+    30: { c: ['√3', '2'], s: ['1', '2'] },
+    45: { c: ['√2', '2'], s: ['√2', '2'] },
+    60: { c: ['1', '2'], s: ['√3', '2'] },
+    90: { c: ['0'], s: ['1'] }
+  };
+  var WHERE = { 0: 'positive x-axis', 90: 'positive y-axis', 180: 'negative x-axis', 270: 'negative y-axis', 360: 'full turn' };
+  var ROMAN = ['', 'I', 'II', 'III', 'IV'];
+
+  var angle = 30, dragging = false, pan = null, lastV = null;
+  var show = { cAngle: true, cPoint: true, cRef: true };
+  var svg = $('uc'), stage = $('stage'), dyn = $('dyn'), pt = $('pt'), hit = $('hit'), halo = $('halo');
+  var slider = $('angle'), stick = $('stick');
+
+  /* ---------- geometry helpers ---------- */
+  function toXY(d, r) { return [CX + r * Math.cos(d * DEG), CY - r * Math.sin(d * DEG)]; }
+  function arcPath(r, a0, a1) {
+    var p0 = toXY(a0, r), p1 = toXY(a1, r);
+    var large = (a1 - a0) > 180 ? 1 : 0;
+    return 'M' + f(p0[0]) + ' ' + f(p0[1]) + ' A' + r + ' ' + r + ' 0 ' + large + ' 0 ' + f(p1[0]) + ' ' + f(p1[1]);
+  }
+  function arrowHead(r, a) {
+    var p = toXY(a, r), th = a * DEG, len = 10;
+    var bx = Math.sin(th), by = Math.cos(th);   // back along the counterclockwise tangent (screen coordinates)
+    function wing(phi) {
+      var c = Math.cos(phi), s = Math.sin(phi);
+      return f(p[0] + len * (bx * c - by * s)) + ' ' + f(p[1] + len * (bx * s + by * c));
+    }
+    return 'M' + wing(0.5) + ' L' + f(p[0]) + ' ' + f(p[1]) + ' L' + wing(-0.5);
+  }
+  function refOf(a) {
+    a = a % 360;
+    if (a <= 90) return a;
+    if (a <= 180) return 180 - a;
+    if (a <= 270) return a - 180;
+    return 360 - a;
+  }
+  function quadrant(a) {
+    a = a % 360;
+    if (a > 0 && a < 90) return 1;
+    if (a > 90 && a < 180) return 2;
+    if (a > 180 && a < 270) return 3;
+    if (a > 270 && a < 360) return 4;
+    return 0;
+  }
+  function values(a) {
+    var rad = a * DEG, c = Math.cos(rad), s = Math.sin(rad);
+    if (Math.abs(c) < 1e-12) c = 0;
+    if (Math.abs(s) < 1e-12) s = 0;
+    var special = SPECIAL.indexOf(a) >= 0;
+    var m = a % 360, ref = refOf(a), xs = null, ys = null;
+    if (special) {
+      var e = EXACT[ref];
+      xs = { p: e.c, neg: (m > 90 && m < 270) && e.c[0] !== '0' };
+      ys = { p: e.s, neg: (m > 180) && e.s[0] !== '0' };
+    }
+    return { a: a, c: c, s: s, special: special, ref: ref, q: quadrant(a), axis: a % 90 === 0, xs: xs, ys: ys };
+  }
+
+  /* ---------- text helpers ---------- */
+  var CW = { '√': 0.85, 'π': 0.62, '−': 0.6, '=': 0.58, ' ': 0.26, '.': 0.26, '°': 0.4, 'θ': 0.5, '/': 0.3 };
+  function tw(str, size) {
+    var w = 0;
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charAt(i);
+      w += CW[ch] !== undefined ? CW[ch] : (ch >= '0' && ch <= '9') ? 0.52 : 0.58;
+    }
+    return w * size;
+  }
+  // the minus is a short thick bar with clear space after it, so it never reads as part of the fraction line
+  function svgVal(parts, neg, x, y, size, cls, anchor) {
+    var two = parts.length > 1;
+    var mw = neg ? size * 0.5 : 0;
+    var gap = neg ? size * 0.55 : 0;
+    var fw = two ? Math.max(tw(parts[0], size), tw(parts[1], size)) + size * 0.3 : tw(parts[0], size);
+    var tot = mw + gap + fw;
+    var left = anchor === 'start' ? x : anchor === 'end' ? x - tot : x - tot / 2;
+    var mid = left + mw + gap + fw / 2;
+    var o = '<g class="m ' + cls + '" font-size="' + size + '" text-anchor="middle">';
+    if (neg) o += '<line x1="' + f(left + 1.5) + '" y1="' + f(y) + '" x2="' + f(left + mw - 1.5) + '" y2="' + f(y) + '" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>';
+    if (two) {
+      o += '<text x="' + f(mid) + '" y="' + f(y - size * 0.58) + '" dominant-baseline="central">' + parts[0] + '</text>';
+      o += '<line x1="' + f(mid - fw / 2) + '" y1="' + f(y) + '" x2="' + f(mid + fw / 2) + '" y2="' + f(y) + '" stroke="currentColor" stroke-width="1.4"/>';
+      o += '<text x="' + f(mid) + '" y="' + f(y + size * 0.66) + '" dominant-baseline="central">' + parts[1] + '</text>';
+    } else {
+      o += '<text x="' + f(mid) + '" y="' + f(y) + '" dominant-baseline="central">' + parts[0] + '</text>';
+    }
+    return o + '</g>';
+  }
+  function svgTxt(str, x, y, size, cls, anchor) {
+    return '<text class="m ' + cls + '" x="' + f(x) + '" y="' + f(y) + '" font-size="' + size +
+      '" text-anchor="' + (anchor || 'middle') + '" dominant-baseline="central">' + str + '</text>';
+  }
+  // first label that fits in the room available on each side of its centre
+  function pickLabel(opts, size, room) {
+    for (var i = 0; i < opts.length; i++) if (tw(opts[i], size) / 2 <= room) return opts[i];
+    return null;
+  }
+  function fh(p) {
+    return p.length > 1 ? '<span class="frac"><span>' + p[0] + '</span><span>' + p[1] + '</span></span>' : p[0];
+  }
+  function fmt(v) {
+    var t = Math.abs(v) < 0.0005 ? '0.000' : v.toFixed(3);
+    return t.replace('-', '−');
+  }
+
+  /* ---------- static layer ---------- */
+  function rimPos(d) {
+    var c = Math.cos(d * DEG), s = Math.sin(d * DEG);
+    var r = R + 20 + 20 * Math.abs(c) + 16 * Math.abs(s);
+    return [CX + r * c, CY - r * s];
+  }
+  function buildBase() {
+    var s = '', tf = 14;
+    s += '<circle class="disk" cx="' + CX + '" cy="' + CY + '" r="' + R + '"/>';
+    [-1, -0.5, 0.5, 1].forEach(function (k) {
+      s += '<line class="gridl" x1="' + f(CX + k * R) + '" y1="' + (CY - R) + '" x2="' + f(CX + k * R) + '" y2="' + (CY + R) + '"/>';
+      s += '<line class="gridl" x1="' + (CX - R) + '" y1="' + f(CY + k * R) + '" x2="' + (CX + R) + '" y2="' + f(CY + k * R) + '"/>';
+    });
+    s += '<line class="axis" x1="' + (CX - R - 12) + '" y1="' + CY + '" x2="' + (CX + R + 12) + '" y2="' + CY + '"/>';
+    s += '<line class="axis" x1="' + CX + '" y1="' + (CY - R - 12) + '" x2="' + CX + '" y2="' + (CY + R + 12) + '"/>';
+    s += '<circle class="rim" cx="' + CX + '" cy="' + CY + '" r="' + R + '"/>';
+    s += '<circle class="grab" cx="' + CX + '" cy="' + CY + '" r="' + R + '" fill="none" stroke="transparent" stroke-width="60" pointer-events="stroke"/>';
+    s += '<text class="tickl m lp" font-size="' + tf + '" x="' + (CX + R - 12) + '" y="' + (CY + 16) + '" text-anchor="middle">1</text>';
+    s += '<text class="tickl m lp" font-size="' + tf + '" x="' + (CX - R + 14) + '" y="' + (CY + 16) + '" text-anchor="middle">−1</text>';
+    s += '<text class="tickl m lp" font-size="' + tf + '" x="' + (CX + 12) + '" y="' + (CY - R + 14) + '" text-anchor="start">1</text>';
+    s += '<text class="tickl m lp" font-size="' + tf + '" x="' + (CX + 12) + '" y="' + (CY + R - 10) + '" text-anchor="start">−1</text>';
+    SPECIAL.forEach(function (d) {
+      if (d === 360) return;
+      var a = toXY(d, R - 7), b = toXY(d, R + 7), l = rimPos(d);
+      s += '<line class="rtick" x1="' + f(a[0]) + '" y1="' + f(a[1]) + '" x2="' + f(b[0]) + '" y2="' + f(b[1]) + '"/>';
+      s += '<g class="rl la" data-deg="' + d + '">' +
+        '<text class="m cm" x="' + f(l[0]) + '" y="' + f(l[1] - FS.rim * 0.5) + '" font-size="' + FS.rim + '" text-anchor="middle" dominant-baseline="central">' + RAD[d].join('/') + '</text>' +
+        '<text class="dg" x="' + f(l[0]) + '" y="' + f(l[1] + FS.deg * 0.85) + '" font-size="' + FS.deg + '" text-anchor="middle" dominant-baseline="central">' + d + '°</text></g>';
+    });
+    $('base').innerHTML = s;
+  }
+
+  /* ---------- dynamic layer ---------- */
+  function drawDyn(v, px, py) {
+    var a = v.a, g = '';
+    var dx = px - CX, dy = py - CY, legX = Math.abs(dx), legY = Math.abs(dy);
+    var hasTri = legX > 2 && legY > 2;
+    var hot = v.special && !v.axis;
+    var lf = FS.leg, af = FS.ang;
+
+    if (hasTri) g += '<polygon class="tri-fill' + (hot ? ' hot' : '') + '" points="' + CX + ',' + CY + ' ' + px + ',' + CY + ' ' + px + ',' + py + '"/>';
+    if (legX > 0.5) g += '<line class="leg lx" x1="' + CX + '" y1="' + CY + '" x2="' + px + '" y2="' + CY + '"/>';
+    if (legY > 0.5) g += '<line class="leg ly" x1="' + px + '" y1="' + CY + '" x2="' + px + '" y2="' + py + '"/>';
+    g += '<line class="hyp" x1="' + CX + '" y1="' + CY + '" x2="' + px + '" y2="' + py + '"/>';
+
+    if (legX >= 22 && legY >= 22) {
+      var sx = v.c > 0 ? -1 : 1, sy = v.s > 0 ? -1 : 1, k = 12;
+      g += '<path class="rt" d="M' + f(px + sx * k) + ' ' + CY + ' L' + f(px + sx * k) + ' ' + f(CY + sy * k) + ' L' + px + ' ' + f(CY + sy * k) + '"/>';
+    }
+
+    // angle arcs and labels
+    var rth = clamp(80, R * 0.55, 110);
+    if (v.q === 1) {
+      // theta and the reference angle are the same angle here: one arc, one label
+      var rq = 40;
+      if (a >= 2) g += '<path class="arc-ref" d="' + arcPath(rq, 0, a) + '"/><path class="arr-ref" d="' + arrowHead(rq, a) + '"/>';
+      if (a >= 20) {
+        var c1 = toXY(a / 2, 68);
+        var l1 = pickLabel(['θ = ' + a + '°', a + '°', 'θ'], af, legX - 8 - Math.abs(c1[0] - CX));
+        if (l1) g += svgTxt(l1, c1[0], c1[1], af, 'angt la lr');
+      }
+    } else {
+      // theta: counterclockwise from the positive x-axis to the terminal side
+      if (a >= 2) g += '<path class="arc-th" d="' + arcPath(rth, 0, Math.min(a, 359.9)) + '"/><path class="arr-th" d="' + arrowHead(rth, a) + '"/>';
+      if (a >= 20) {
+        var c2 = toXY(Math.min(a, 359.9) / 2, rth - 20);
+        g += svgTxt('θ = ' + a + '°', c2[0], c2[1], af, 'angt la');
+      }
+      if (v.q !== 0) {
+        var a0, a1;
+        if (v.q === 2) { a0 = a; a1 = 180; } else if (v.q === 3) { a0 = 180; a1 = a; } else { a0 = a; a1 = 360; }
+        if (v.ref >= 2) g += '<path class="arc-ref" d="' + arcPath(34, a0, a1) + '"/>';
+        if (v.ref >= 20) {
+          var c3 = toXY((a0 + a1) / 2, 60);
+          var l3 = pickLabel([v.ref + '°', 'θ′'], af, legX - 8 - Math.abs(c3[0] - CX));
+          if (l3) g += svgTxt(l3, c3[0], c3[1], af, 'ang num lr');
+        }
+      }
+    }
+
+    // side lengths: the x and y coordinates (signed)
+    if (hasTri && legX >= 24) {
+      var xc = (CX + px) / 2, yc = CY + (v.s > 0 ? lf * 1.7 : -lf * 1.7);
+      g += v.special ? svgVal(v.xs.p, v.xs.neg, xc, yc, lf, 'cx lp', 'middle') : svgTxt(fmt(v.c), xc, yc, lf, 'cx lp');
+    }
+    if (hasTri && legY >= 14) {
+      var stacked = v.special && v.ys.p.length > 1;
+      if (legY >= (stacked ? 44 : 40)) {
+        var yc2 = (CY + py) / 2, xc2 = px + (v.c > 0 ? 12 : -12), anc = v.c > 0 ? 'start' : 'end';
+        g += v.special ? svgVal(v.ys.p, v.ys.neg, xc2, yc2, lf, 'cy lp', anc) : svgTxt(fmt(v.s), xc2, yc2, lf, 'cy lp', anc);
+      } else {
+        // short leg: put the label just beyond its end so it stays clear of the rim labels
+        var yc3 = py + (v.s > 0 ? -lf * 1.1 : lf * 1.1);
+        g += v.special ? svgVal(v.ys.p, v.ys.neg, px, yc3, lf, 'cy lp', 'middle') : svgTxt(fmt(v.s), px, yc3, lf, 'cy lp');
+      }
+    }
+
+    // hypotenuse = 1, on the side away from the triangle
+    var sg = (v.s * v.c) < 0 ? -1 : 1;
+    var ox = -v.s * sg, oy = v.c * sg;
+    g += svgTxt('1', CX + dx * 0.64 + 17 * ox, CY + dy * 0.64 - 17 * oy, lf, 'ci lp');
+
+    // multiples of π/2 have no triangle, so show the point right on the circle
+    if (v.special && v.axis) {
+      var qx = Math.round(v.c), qy = Math.round(v.s);
+      var qpos = qy === 0 ? [px - qx * 58, py + 26] : [px + 46, py + qy * 17];
+      var sgn = function (n) { return (n < 0 ? '−' : '') + Math.abs(n); };
+      g += '<text class="m lp ci" x="' + f(qpos[0]) + '" y="' + f(qpos[1]) + '" font-size="' + lf + '" text-anchor="middle" dominant-baseline="central">(<tspan class="cx">' +
+        sgn(qx) + '</tspan>, <tspan class="cy">' + sgn(qy) + '</tspan>)</text>';
+    }
+    return g;
+  }
+
+  /* ---------- readouts ---------- */
+  function coordHTML(v) {
+    var minus = '<span class="neg" role="img" aria-label="minus"></span>';
+    var X = v.special ? (v.xs.neg ? minus : '') + fh(v.xs.p) : fmt(v.c);
+    var Y = v.special ? (v.ys.neg ? minus : '') + fh(v.ys.p) : fmt(v.s);
+    return { X: X, Y: Y };
+  }
+  function updateBadge() {
+    var v = lastV, txt = '';
+    if (v && v.special) {
+      if (!v.axis) { if (show.cRef) txt = 'Special angle: ' + v.ref + '° reference triangle'; }
+      else if (show.cAngle || show.cRef) txt = 'Special angle: ' + v.a + '° (' + WHERE[v.a] + ')';
+    }
+    var b = $('badge');
+    if (txt) b.textContent = txt;
+    b.classList.toggle('on', !!txt);
+  }
+
+  function render() {
+    var a = angle, v = values(a);
+    lastV = v;
+    var p = toXY(a, R), px = f(p[0]), py = f(p[1]);
+    [pt, hit, halo].forEach(function (el) { el.setAttribute('cx', px); el.setAttribute('cy', py); });
+    dyn.innerHTML = drawDyn(v, px, py);
+    halo.setAttribute('r', v.special ? 16 : 13);
+    halo.classList.toggle('sp', v.special);
+
+    var radHTML = v.special ? '= ' + fh(RAD[a]) + ' rad' : '≈ ' + (a * DEG).toFixed(3) + ' rad';
+    $('cAngle').innerHTML = '<div class="k">Angle θ</div><div class="v"><span>' + a + '°</span><span class="sub">' + radHTML + '</span></div>';
+    var co = coordHTML(v);
+    $('cPoint').innerHTML = '<div class="k">Point (x, y) = (cos θ, sin θ)</div><div class="v"><span>(</span><span class="vx">' + co.X + '</span><span>,</span><span class="vy">' + co.Y + '</span><span>)</span></div>';
+    $('cRef').innerHTML = '<div class="k">Reference angle</div><div class="v"><span>' + (v.axis ? '—' : v.ref + '°') + '</span><span class="sub">' + (v.axis ? 'on an axis' : 'Quadrant ' + ROMAN[v.q]) + '</span></div>';
+
+    $('angleOut').innerHTML = a + '° <span class="sub">' + radHTML + '</span>';
+    slider.value = a;
+    slider.setAttribute('aria-valuetext', a + ' degrees');
+    svg.setAttribute('aria-label', 'Unit circle with the point at ' + a + ' degrees');
+
+    var rls = document.querySelectorAll('.rl');
+    for (var i = 0; i < rls.length; i++) {
+      rls[i].classList.toggle('on', +rls[i].getAttribute('data-deg') === (a === 360 ? 0 : a));
+    }
+    updateBadge();
+  }
+
+  function setAngle(a, opts) {
+    opts = opts || {};
+    a = Math.max(0, Math.min(360, Math.round(a)));
+    if (!opts.force && stick.checked) {
+      var best = a, bd = 99;
+      SPECIAL.forEach(function (s) { var d = Math.abs(s - a); if (d < bd) { bd = d; best = s; } });
+      if (bd <= 3) a = best;
+    }
+    if (opts.drag && a === 360) a = 0;
+    angle = a;
+    render();
+  }
+
+  /* ---------- layout: size comes from the container width and the size slider ---------- */
+  function layout() {
+    var W = stage.clientWidth || 320;
+    var fit = clamp(300, W, 620);
+    S = Math.round(fit);
+    CX = CY = S / 2;
+    R = Math.round(S / 2 - M);
+    FS.leg = clamp(15, R / 9, 21);
+    FS.ang = clamp(14, R / 11, 19);
+    FS.rim = clamp(14, R / 13, 17);
+    FS.deg = Math.max(12, FS.rim - 2);
+    svg.setAttribute('width', S);
+    svg.setAttribute('height', S);
+    svg.setAttribute('viewBox', '0 0 ' + S + ' ' + S);
+    pt.setAttribute('r', 10);
+    hit.setAttribute('r', 34);
+    buildBase();
+    render();
+    stage.classList.toggle('zoomed', S > W + 1);
+  }
+  /* ---------- controls ---------- */
+  var tk = '';
+  SPECIAL.forEach(function (d) {
+    tk += '<i class="' + (d % 90 === 0 ? 'q' : '') + '" style="--p:' + (d / 360) + '"></i>';
+    if (d % 90 === 0) tk += '<b style="--p:' + (d / 360) + '"><span>' + d + '°</span><span class="tr">' + fh(RAD[d]) + '</span></b>';
+  });
+  $('ticks').innerHTML = tk;
+
+  slider.addEventListener('input', function () { setAngle(+slider.value); });
+  stick.addEventListener('change', function () { setAngle(angle); });
+
+  function syncReadout() {
+    $('readout').hidden = $('cAngle').hidden && $('cPoint').hidden && $('cRef').hidden;
+  }
+  var togs = document.querySelectorAll('.tog');
+  for (var t = 0; t < togs.length; t++) {
+    togs[t].addEventListener('click', function (e) {
+      var btn = e.currentTarget, on = btn.getAttribute('aria-pressed') !== 'true';
+      btn.setAttribute('aria-pressed', String(on));
+      var target = btn.getAttribute('data-target');
+      var cls = { cAngle: 'hide-angle', cPoint: 'hide-point', cRef: 'hide-ref' }[target];
+      if (cls) { svg.classList.toggle(cls, !on); show[target] = on; }
+      $(target).hidden = !on;
+      syncReadout();
+      updateBadge();
+    });
+  }
+
+  // dragging the point (mouse, pen and touch)
+  function moveTo(e) {
+    var p = svg.createSVGPoint();
+    p.x = e.clientX; p.y = e.clientY;
+    var q = p.matrixTransform(svg.getScreenCTM().inverse());
+    var d = Math.atan2(CY - q.y, q.x - CX) / DEG;
+    if (d < 0) d += 360;
+    setAngle(d, { drag: true });
+  }
+  svg.addEventListener('pointerdown', function (e) {
+    if (!e.target.closest || !e.target.closest('.grab')) {
+      // mouse users drag the background to pan; touch scrolls natively
+      if (e.pointerType === 'mouse' && stage.classList.contains('zoomed')) {
+        pan = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop };
+        stage.classList.add('panning');
+        try { svg.setPointerCapture(e.pointerId); } catch (err) { /* capture is optional */ }
+        e.preventDefault();
+      }
+      return;
+    }
+    dragging = true;
+    try { svg.setPointerCapture(e.pointerId); } catch (err) { /* capture is optional */ }
+    e.preventDefault();
+    moveTo(e);
+  });
+  svg.addEventListener('pointermove', function (e) {
+    if (pan) {
+      stage.scrollLeft = pan.l - (e.clientX - pan.x);
+      stage.scrollTop = pan.t - (e.clientY - pan.y);
+    } else if (dragging) moveTo(e);
+  });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (t) {
+    svg.addEventListener(t, function () { dragging = false; pan = null; stage.classList.remove('panning'); });
+  });
+  svg.addEventListener('touchstart', function (e) {
+    if (e.target.closest && e.target.closest('.grab')) e.preventDefault();
+  }, { passive: false });
+
+  var lastW = 0;
+  function onResize() {
+    var w = stage.clientWidth;
+    if (w && w !== lastW) { lastW = w; layout(); }
+  }
+  if (window.ResizeObserver) new ResizeObserver(onResize).observe(stage);
+  window.addEventListener('resize', onResize);
+  lastW = stage.clientWidth;
+  layout();
+})();
+</script>
+
+</body></html>
